@@ -1,0 +1,15 @@
+# Compiled object files
+*.o
+
+# DLLs
+*.dll
+
+# Generated DEF files
+*.def
+
+# Build folders
+out/
+obj/
+
+# Editor/IDE files (if you use VSCode, etc.)
+.vscode/
