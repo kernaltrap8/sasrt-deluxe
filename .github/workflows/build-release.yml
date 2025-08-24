@@ -1,38 +1,61 @@
-name: Build and Release DLL
+name: Build and Release
 
 on:
   push:
     branches:
       - master
+  workflow_dispatch:  # Allows manual triggering
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up MinGW
-        uses: msys2/setup-msys2@v3
-        with:
-          update: true
-          install: >
-            mingw-w64-i686-gcc
-            mingw-w64-i686-gcc-c++
-            mingw-w64-i686-headers
-            mingw-w64-i686-crt
-            mingw-w64-i686-winpthreads
-
-      - name: Build DLL
-        run: |
-          make clean
-          make
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: out/d3d9.dll
-          draft: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install MinGW-w64
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mingw-w64 mingw-w64-tools
+        
+    - name: Build with make
+      run: make
+        
+    - name: Verify output file exists
+      run: |
+        if [ ! -f "out/d3d9.dll" ]; then
+          echo "Error: out/d3d9.dll not found!"
+          exit 1
+        fi
+        ls -la out/d3d9.dll
+        
+    - name: Generate release info
+      id: release_info
+      run: |
+        COMMIT_SHA=$(git rev-parse --short HEAD)
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        RELEASE_TAG="build-${TIMESTAMP}-${COMMIT_SHA}"
+        echo "tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+        echo "name=Build ${TIMESTAMP} (${COMMIT_SHA})" >> $GITHUB_OUTPUT
+        
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.release_info.outputs.tag }}
+        release_name: ${{ steps.release_info.outputs.name }}
+        draft: false
+        prerelease: false
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./out/d3d9.dll
+        asset_name: d3d9.dll
+        asset_content_type: application/octet-stream

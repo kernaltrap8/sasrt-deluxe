@@ -28,7 +28,8 @@ DEF_FILE = $(LIB_DIR)/d3d9.def
 VERSION_HEADER = $(SRC_DIR)/version.h
 
 # Default target
-all: $(VERSION_HEADER) $(TARGET) deploy
+#all: $(VERSION_HEADER) $(TARGET) deploy
+all: $(VERSION_HEADER) $(TARGET)
 
 # Generate version header
 $(VERSION_HEADER):
@@ -66,10 +67,10 @@ $(OBJ_DIR):
 	@mkdir -p $(OBJ_DIR)
 
 # Deploy DLL to game directory
-deploy: $(TARGET)
-	@echo "Deploying to game directory..."
-	cp $(TARGET) $(GAME_DIR)/d3d9.dll
-	sha256sum $(TARGET) $(GAME_DIR)/d3d9.dll
+#deploy: $(TARGET)
+#	@echo "Deploying to game directory..."
+#	cp $(TARGET) $(GAME_DIR)/d3d9.dll
+#	sha256sum $(TARGET) $(GAME_DIR)/d3d9.dll
 
 # Clean build
 clean:
@@ -87,4 +88,5 @@ info:
 	@echo "Game directory: $(GAME_DIR)"
 	@echo "Version header: $(VERSION_HEADER)"
 
-.PHONY: all deploy clean rebuild info
+#.PHONY: all deploy clean rebuild info
+.PHONY: all clean rebuild info
