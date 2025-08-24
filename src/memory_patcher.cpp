@@ -22,7 +22,7 @@ static uintptr_t menuPhysicsTiming = 0x6622ac;
 static uintptr_t vehiclePhysicsTiming = 0x6b3ba0;
 
 // address(es) to skip
-static const uintptr_t skipOffsets[] = { vehiclePhysicsTiming };
+static const uintptr_t skipOffsets[] = { vehiclePhysicsTiming, menuPhysicsTiming, frameTiming };
 static const size_t skipCount = sizeof(skipOffsets) / sizeof(skipOffsets[0]);
 
 bool IsTargetFloat(float value) {
@@ -39,57 +39,67 @@ bool ShouldSkip(uintptr_t offset) {
 void PatchMemory() {
     if (alreadyPatched) return;
 
-    float dynamicFloatValue = GetRefreshRate();
-    Log("dynamicFloatValue : %f\n", dynamicFloatValue);
-
-    HMODULE hModule = GetModuleHandle(NULL);
-    if (!hModule) return;
+    HMODULE baseModule = GetModuleHandle(NULL);
+    if (!baseModule) return;
 
     MODULEINFO modInfo;
-    if (!GetModuleInformation(GetCurrentProcess(), hModule, &modInfo, sizeof(modInfo))) return;
+    if (!GetModuleInformation(GetCurrentProcess(), baseModule, &modInfo, sizeof(modInfo))) return;
 
-    unsigned char *baseAddr = (unsigned char *)modInfo.lpBaseOfDll;
-    unsigned char *endAddr = baseAddr + modInfo.SizeOfImage;
-    unsigned char *addr = baseAddr;
+    unsigned char* addr = (unsigned char*)modInfo.lpBaseOfDll;
+    unsigned char* endAddr = addr + modInfo.SizeOfImage;
     MEMORY_BASIC_INFORMATION mbi;
 
-    Log("Starting memory patching...\n");
+    double refreshDouble = (double)GetRefreshRate();
+    double tickDouble = 1.0 / GetRefreshRate();
+    int doublePatched = 0;
+    int tickPatched = 0;
 
-    while (addr < endAddr && patchCount < 2) {
+    while (addr < endAddr && (doublePatched < 1 || tickPatched < 1)) {
         if (VirtualQuery(addr, &mbi, sizeof(mbi)) == sizeof(mbi)) {
             if ((mbi.State == MEM_COMMIT) &&
                 (mbi.Protect & (PAGE_READWRITE | PAGE_READONLY | PAGE_EXECUTE_READ)) &&
                 !(mbi.Protect & (PAGE_GUARD | PAGE_NOACCESS))) {
 
-                float *f = (float *)(((uintptr_t)addr + 3) & ~3);
-                float *endF = (float *)((unsigned char *)mbi.BaseAddress + mbi.RegionSize);
+                unsigned char* regionBase = (unsigned char*)mbi.BaseAddress;
+                size_t regionSize = mbi.RegionSize;
 
-                while (f < endF && patchCount < 2) {
-                    if ((unsigned char *)f + sizeof(float) > (unsigned char *)mbi.BaseAddress + mbi.RegionSize) break;
+                for (size_t i = 0; i < regionSize; i++) {
+                    unsigned char* p = regionBase + i;
 
-                    if (IsTargetFloat(*f)) {
-                        uintptr_t currentOffset = (unsigned char *)f - baseAddr;
-                        if (ShouldSkip(currentOffset)) { f++; continue; }
-
-                        patchCount++;
-                        Log("Found float #%d at 0x%p, patching %.8f -> %.8f\n",
-                            patchCount, f, *f, dynamicFloatValue);
-
-                        DWORD oldProtect;
-                        if (VirtualProtect(f, sizeof(float), PAGE_READWRITE, &oldProtect)) {
-                            *f = dynamicFloatValue;
-                            VirtualProtect(f, sizeof(float), oldProtect, &oldProtect);
-                            Log("Successfully patched float #%d!\n", patchCount);
+                    // Patch 8-byte double refresh rate
+                    if (doublePatched < 1 && i + 8 <= regionSize) {
+                        double val;
+                        memcpy(&val, p, sizeof(double));
+                        if (fabs(val - 60.0) < 1e-6) {
+                            DWORD oldProtect;
+                            VirtualProtect(p, 8, PAGE_READWRITE, &oldProtect);
+                            memcpy(p, &refreshDouble, 8);
+                            VirtualProtect(p, 8, oldProtect, &oldProtect);
+                            doublePatched++;
+                            Log("[Double FPS] Patched at %p -> %f\n", p, refreshDouble);
                         }
                     }
-                    f++;
+
+                    // Patch 8-byte tick/delta
+                    if (tickPatched < 1 && i + 8 <= regionSize) {
+                        double val;
+                        memcpy(&val, p, sizeof(double));
+                        if (fabs(val - 0.01666666753590107) < 1e-9) {
+                            DWORD oldProtect;
+                            VirtualProtect(p, 8, PAGE_READWRITE, &oldProtect);
+                            memcpy(p, &tickDouble, 8);
+                            VirtualProtect(p, 8, oldProtect, &oldProtect);
+                            tickPatched++;
+                            Log("[Tick double] Patched at %p -> %f\n", p, tickDouble);
+                        }
+                    }
                 }
             }
             addr += mbi.RegionSize;
-        } else { break; }
+        } else break;
     }
 
-    Log("Finished patching floats (patched %d floats)\n", patchCount);
+    Log("PatchMemory complete: Double FPS patched=%d, Tick double patched=%d\n", doublePatched, tickPatched);
     alreadyPatched = true;
 }
 

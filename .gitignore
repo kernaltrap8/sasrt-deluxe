@@ -13,3 +13,6 @@ obj/
 
 # Editor/IDE files (if you use VSCode, etc.)
 .vscode/
+
+# Version header
+src/version.h

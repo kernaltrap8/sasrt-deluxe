@@ -10,7 +10,7 @@ SRC_DIR = src
 OBJ_DIR = obj
 LIB_DIR = lib
 OUT_DIR = out
-# on Windows this will be C:\Users\Username\Program Files (x86)\Steam\steamapps\common\Sonic & All-Stars Racing Transformed
+
 GAME_DIR = ~/.local/share/Steam/steamapps/common/Sonic\ \&\ All-Stars\ Racing\ Transformed/
 
 # Sources and objects
@@ -23,11 +23,22 @@ SOURCES = $(SRC_DIR)/dllmain.cpp \
 
 OBJECTS = $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
 
-# Target
 TARGET = $(OUT_DIR)/d3d9.dll
 DEF_FILE = $(LIB_DIR)/d3d9.def
+VERSION_HEADER = $(SRC_DIR)/version.h
 
-all: $(TARGET) deploy
+# Default target
+all: $(VERSION_HEADER) $(TARGET) deploy
+
+# Generate version header
+$(VERSION_HEADER):
+	@mkdir -p $(dir $(VERSION_HEADER))
+	@echo "// Auto-generated file" > $(VERSION_HEADER)
+	@echo "#pragma once" >> $(VERSION_HEADER)
+	@COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown); \
+	TAG=$$(git describe --tags --always --dirty 2>/dev/null || echo unknown); \
+	echo "#define GIT_COMMIT \"$$COMMIT\"" >> $(VERSION_HEADER); \
+	echo "#define GIT_TAG \"$$TAG\"" >> $(VERSION_HEADER)
 
 # Ensure output directory exists before linking
 $(TARGET): $(OBJECTS) $(DEF_FILE) | $(OUT_DIR)
@@ -64,7 +75,7 @@ deploy: $(TARGET)
 clean:
 	@echo "Cleaning up..."
 	rm -rf $(OBJ_DIR) $(OUT_DIR)
-	rm -f $(DEF_FILE)
+	rm -f $(DEF_FILE) $(VERSION_HEADER)
 
 rebuild: clean all
 
@@ -74,5 +85,6 @@ info:
 	@echo "Object files: $(OBJECTS)"
 	@echo "Target: $(TARGET)"
 	@echo "Game directory: $(GAME_DIR)"
+	@echo "Version header: $(VERSION_HEADER)"
 
 .PHONY: all deploy clean rebuild info

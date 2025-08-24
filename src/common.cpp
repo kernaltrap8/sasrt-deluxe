@@ -32,15 +32,12 @@ void Log(const char *fmt, ...) {
 float GetRefreshRate() {
     DEVMODE dm = {};
     dm.dmSize = sizeof(dm);
-
-    // Get settings of the primary display
     if (EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &dm)) {
         if (dm.dmDisplayFrequency > 0) {
-            return 1.0f / (float)dm.dmDisplayFrequency;
+            return (float)dm.dmDisplayFrequency;
         }
     }
-    // fallback
-    return 1.0f / 60.0f;
+    return 60.0f; // fallback
 }
 
 BOOL PatchIAT_ReplaceImport(const char *moduleName, const char *importName, void *newFunc) {
