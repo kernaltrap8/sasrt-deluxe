@@ -83,7 +83,8 @@ DWORD WINAPI TickWatchThread(LPVOID lpParam) {
     HMODULE baseModule = GetModuleHandle(NULL);
     if (!baseModule) return -1;
 
-    float tickFloat = 1.0f / (GetRefreshRate() - 20.0f);
+    float refresh = std::min(GetRefreshRate(), 100.0f);
+    float tickFloat = 1.0f / (refresh - 20.0f);
 
     // 3 floats to patch at boot
     unsigned char* floatAddrs[3] = {
