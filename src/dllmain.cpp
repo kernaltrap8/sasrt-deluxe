@@ -8,6 +8,7 @@
 #include "d3d9_proxy.h"
 #include "debug_hooks.h"
 #include "window_hooks.h"
+#include "file_hooks.h"
 #include "version.h"
 
 static const char* CUSTOM_WINDOW_TITLE = "Sonic & All-Stars Racing Transformed Deluxe - BUILD (532043 - Jan 15 2014 10:38:42)";
@@ -82,32 +83,26 @@ DWORD WINAPI TickWatchThread(LPVOID lpParam) {
     HMODULE baseModule = GetModuleHandle(NULL);
     if (!baseModule) return -1;
 
-    // --- PATCH 3 KNOWN FLOATS ---
-    float tickFloat = 1.0f / GetRefreshRate();
+    float tickFloat = 1.0f / (GetRefreshRate() - 20.0f);
+
+    // 3 floats to patch at boot
     unsigned char* floatAddrs[3] = {
-        (unsigned char*)((uintptr_t)baseModule + 0x65f320), // 0x00a5f320
-        (unsigned char*)((uintptr_t)baseModule + 0x6610a0), // 0x00a610a0
-        (unsigned char*)((uintptr_t)baseModule + 0x6b29a0)  // 0x00ab29a0
-        //(unsigned char*)((uintptr_t)0x36fa1e4),
-        //(unsigned char*)((uintptr_t)baseModule + 0x10137408)
+        (unsigned char*)((uintptr_t)baseModule + 0x660528),
+        (unsigned char*)((uintptr_t)baseModule + 0x6622ac),
+        (unsigned char*)((uintptr_t)baseModule + 0x6b3ba0)
     };
 
-    int floatsPatched = 0;
-
-    for (int i = 0; i < (sizeof(floatAddrs) / sizeof(floatAddrs[0])); i++) {
+    for (int i = 0; i < 3; i++) {
         DWORD oldProtect;
         if (VirtualProtect(floatAddrs[i], sizeof(float), PAGE_READWRITE, &oldProtect)) {
-            *(float*)floatAddrs[i] = tickFloat; 
+            *(float*)floatAddrs[i] = tickFloat;
             VirtualProtect(floatAddrs[i], sizeof(float), oldProtect, &oldProtect);
-            Log("[FPS float] Patched float #%d at %p -> %f\n", i+1, floatAddrs[i], tickFloat);
+            Log("[FPS float] Patched float #%d at %p -> %f", i + 1, floatAddrs[i], tickFloat);
         }
-        floatsPatched++;
     }
 
-    Log("%s : Floats patched=%d\n", __FUNCTION__, floatsPatched);
     return 0;
 }
-
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
     switch (fdwReason) {
@@ -123,10 +118,15 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
 
             // Patch IAT imports in the game
             Log("Setting up API hooks...\n");
-            PatchIAT_ReplaceImport("D3D9.DLL", "Direct3DCreate9", (void*)Direct3DCreate9);
-            PatchIAT_ReplaceImport("KERNEL32.dll", "IsDebuggerPresent", (void*)FakeIsDebuggerPresent);
+            PatchIAT_ReplaceImport("D3D9.DLL",     "Direct3DCreate9",    (void*)Direct3DCreate9);
+            PatchIAT_ReplaceImport("KERNEL32.dll", "IsDebuggerPresent",  (void*)FakeIsDebuggerPresent);
             PatchIAT_ReplaceImport("KERNEL32.dll", "OutputDebugStringA", (void*)FakeOutputDebugStringA);
-            
+            PatchIAT_ReplaceImport("KERNEL32.dll", "CreateFileA",        (void*)Hooked_CreateFileA);
+            PatchIAT_ReplaceImport("KERNEL32.dll", "CreateFileW",        (void*)Hooked_CreateFileW);
+            PatchIAT_ReplaceImport("KERNEL32.dll", "ReadFile",           (void*)Hooked_ReadFile);
+            PatchIAT_ReplaceImport("KERNEL32.dll", "WriteFile",          (void*)Hooked_WriteFile);
+            PatchIAT_ReplaceImport("KERNEL32.dll", "CloseHandle",        (void*)Hooked_CloseHandle);
+
             // Set up window title hooks
             SetupWindowTitleHooks(CUSTOM_WINDOW_TITLE);
 

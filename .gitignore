@@ -16,3 +16,6 @@ obj/
 
 # Version header
 src/version.h
+
+# Local build script
+build.sh

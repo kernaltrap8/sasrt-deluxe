@@ -19,7 +19,8 @@ SOURCES = $(SRC_DIR)/dllmain.cpp \
           $(SRC_DIR)/memory_patcher.cpp \
           $(SRC_DIR)/window_hooks.cpp \
           $(SRC_DIR)/debug_hooks.cpp \
-          $(SRC_DIR)/d3d9_proxy.cpp
+          $(SRC_DIR)/d3d9_proxy.cpp \
+		  $(SRC_DIR)/file_hooks.cpp
 
 OBJECTS = $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
 
